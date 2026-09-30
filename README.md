@@ -1,9 +1,10 @@
-[README (1).md](https://github.com/user-attachments/files/32855308/README.1.md)
+[README (3).md](https://github.com/user-attachments/files/32857248/README.3.md)
 # 🧹 SWYNEX Data Analysis: Data Cleaning & Preparation
 
 Cleaning a raw public dataset so it is ready for analysis, using **Python (pandas)** and a browser-based tool, **Data Cleaning Studio**.
 
-🌐 **Live app:** [your-app-link](https://jd_massilie.github.io/SWYNEX-Data-Analysis/)
+🌐 **Live app:** [Open Data Cleaning Studio](https://JDSALAGALA.github.io/SWYNEX-Data-Analysis/)
+💼 **LinkedIn post:** [See the project post](https://lnkd.in/p/dsus8Qdu)
 📂 **Dataset:** Titanic passenger data ([source](https://github.com/datasciencedojo/datasets))
 
 ---
@@ -25,6 +26,7 @@ SWYNEX-Data-Analysis/
 │   ├── raw.csv            # Original, untouched dataset
 │   └── cleaned.csv        # Cleaned dataset
 ├── clean_data.py          # Python cleaning pipeline
+├── requirements.txt       # Python dependencies
 ├── cleaning_log.md        # Auto-generated log of issues and actions
 ├── index.html             # Data Cleaning Studio web app
 ├── linkedin/              # Project visuals (PNG + SVG)
@@ -33,14 +35,14 @@ SWYNEX-Data-Analysis/
 
 ## 🔍 Issues Identified
 
-> Fill the numbers from `cleaning_log.md` after running the script.
+> Figures below are for the raw Titanic file (891 × 12). Confirm them against `cleaning_log.md` after running the script.
 
 | Issue Type | Findings |
 |---|---|
-| **Missing values** | `age` (~20%), `cabin` (~77%), `embarked` (2 rows) |
-| **Duplicate records** | X exact duplicate rows |
+| **Missing values** | `age` (177 rows, ~19.9%), `cabin` (687 rows, ~77.1%), `embarked` (2 rows) |
+| **Duplicate records** | 0 exact duplicate rows (every `PassengerId` is unique) |
 | **Incorrect data types** | `survived` and `pclass` stored as integers but are categories |
-| **Inconsistent values** | Mixed-case column names, stray whitespace in text fields |
+| **Inconsistent values** | Mixed-case / camelCase column names (`PassengerId`, `SibSp`); text fields checked for whitespace and case variants |
 
 ## 🛠️ Cleaning Steps
 
@@ -51,23 +53,23 @@ SWYNEX-Data-Analysis/
 | 3 | Handle placeholders | `''`, `?`, `N/A` converted to proper nulls |
 | 4 | Remove duplicates | Dropped exact duplicate rows |
 | 5 | Fix data types | Numeric, datetime and categorical conversions |
-| 6 | Handle missing values | Dropped columns >60% empty; median for numbers, mode for text |
+| 6 | Handle missing values | Dropped `cabin` (>60% empty); `age` filled with median; `embarked` filled with most common port |
 | 7 | Check outliers | Flagged with the IQR rule but **kept** (they are genuine values) |
 
-**Result:** `891 rows × 12 columns` (raw) → `N rows × M columns` (cleaned)
+**Result:** `891 rows × 12 columns` (raw) → `891 rows × 11 columns` (cleaned)
 
 ## 🚀 How to Run
 
 ### Python script
 ```bash
-pip install pandas tabulate
+pip install -r requirements.txt
 python clean_data.py                 # uses the Titanic dataset by default
 python clean_data.py my_file.csv     # or any CSV file / URL
 ```
 Outputs `data/raw.csv`, `data/cleaned.csv` and `cleaning_log.md`.
 
 ### Web app
-Open the [live app](https://your-username.github.io/SWYNEX-Data-Analysis/), or open `index.html` locally, then:
+Open the [live app](https://JDSALAGALA.github.io/SWYNEX-Data-Analysis/), or open `index.html` locally, then:
 1. Upload a CSV (or try the built-in messy sample)
 2. Review the issues found
 3. Choose the cleaning actions to apply
@@ -102,8 +104,8 @@ Everything runs in your browser, and no data is uploaded anywhere.
 
 ## 👤 Author
 
-**Your Name**
-[LinkedIn](https://linkedin.com/in/your-profile) · [GitHub](https://github.com/your-username)
+**JDSALAGALA**
+[LinkedIn](https://www.linkedin.com/in/salagala-j-d-massilie-161265371) · [GitHub](https://github.com/JDSALAGALA)
 
 ---
 ⭐ If you found this useful, consider starring the repo!
