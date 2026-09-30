@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SWYNEX-Data-Analysis</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f6f7f9;--card:#fff;--ink:#16181d;--mute:#5d6673;--line:#e2e5ea;--acc:#2563eb;--accbg:#e8effd;--bad:#c2410c;--badbg:#fff1e6;--ok:#15803d;--okbg:#e7f6ec}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1115;--card:#181b21;--ink:#eceef2;--mute:#9aa3b0;--line:#2a2f38;--acc:#6b9cff;--accbg:#1d2740;--bad:#fb923c;--badbg:#33220f;--ok:#4ade80;--okbg:#13291b}}
+:root[data-theme="dark"]{--bg:#0f1115;--card:#181b21;--ink:#eceef2;--mute:#9aa3b0;--line:#2a2f38;--acc:#6b9cff;--accbg:#1d2740;--bad:#fb923c;--badbg:#33220f;--ok:#4ade80;--okbg:#13291b}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:980px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:26px;margin:8px 0 4px}h2{font-size:17px;margin:0 0 10px}
+.sub{color:var(--mute);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.step{display:inline-block;background:var(--accbg);color:var(--acc);font-weight:600;border-radius:99px;padding:1px 10px;font-size:12px;margin-right:8px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px}
+button.p{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:26px;text-align:center;color:var(--mute)}
+.drop.on{border-color:var(--acc);background:var(--accbg)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;margin-top:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{border-radius:10px;padding:12px;background:var(--bg)}
+.stat b{display:block;font-size:24px}
+.stat.bad{background:var(--badbg);color:var(--bad)}.stat.ok{background:var(--okbg);color:var(--ok)}
+.stat span{font-size:12px;color:inherit;opacity:.85}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px;margin-top:10px;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:6px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--bg);position:sticky;top:0}
+td.n{color:var(--bad);font-style:italic}
+label.opt{display:flex;gap:8px;align-items:flex-start;padding:6px 0;cursor:pointer}
+label.opt small{display:block;color:var(--mute)}
+ul.log{margin:8px 0 0;padding-left:18px}ul.log li{margin:3px 0}
+.tag{font-size:11px;padding:1px 7px;border-radius:99px;background:var(--accbg);color:var(--acc);margin-left:6px}
+textarea{width:100%;height:140px;font:12px monospace;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>🧹 Data Cleaning Studio</h1>
+<p class="sub">Load a raw CSV, see its problems (missing values, duplicates, wrong types, inconsistent values), clean it and download the result plus a change log. Everything runs in your browser.</p>
+
+<div class="card">
+  <h2><span class="step">1</span>Load a dataset</h2>
+  <div class="drop" id="drop">Drop a .csv file here
+    <div class="row">
+      <button class="p" onclick="fileIn.click()">Choose CSV</button>
+      <button onclick="loadSample()">Try messy sample data</button>
+    </div>
+    <input id="fileIn" type="file" accept=".csv,text/csv" class="hide">
+  </div>
+</div>
+
+<div id="s2" class="card hide"><h2><span class="step">2</span>Issues found</h2><div id="issues"></div></div>
+
+<div id="s3" class="card hide">
+  <h2><span class="step">3</span>Choose cleaning actions</h2>
+  <div id="opts"></div>
+  <button class="p" onclick="runClean()">Clean dataset</button>
+</div>
+
+<div id="s4" class="card hide">
+  <h2><span class="step">4</span>Result</h2>
+  <div id="res"></div>
+  <div class="row" style="justify-content:flex-start">
+    <button class="p" onclick="dl('csv')">⬇ Download cleaned.csv</button>
+    <button onclick="dl('log')">⬇ Download cleaning_log.md</button>
+  </div>
+  <details style="margin-top:10px"><summary>Copy CSV text instead</summary><textarea id="ta" readonly></textarea></details>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const NULLS=new Set(['','na','n/a','null','none','?','-','nan','#n/a','missing']);
+let RAW=null,OUT=null,LOG='';
+const SAMPLE=`ID,Full Name,City ,Age,Salary,Join Date,Department
+1,Asha Rao,Hyderabad,29,"$52,000",2021-03-15,Sales
+2,  Ravi Kumar,hyderabad,34,"$61,500",15/04/2020,sales
+3,Meena Iyer,CHENNAI,,"$48,000",2022-01-10,HR
+4,Arjun Das,Chennai,41,N/A,2019-07-22,Engineering
+5,Asha Rao,Hyderabad,29,"$52,000",2021-03-15,Sales
+6,Kiran Patel,Mumbai ,abc,"$75,000",2018-11-05,engineering
+7,Sneha Reddy,mumbai,27,"$58,200",,HR
+8,Vikram Singh,Delhi,38,"$90,000",2017-05-30,Engineering
+9,Priya Nair,DELHI,-,"$47,300",2023-02-01,Sales
+10,Ravi Kumar,Hyderabad,34,"$61,500",2020-04-15,Sales
+11,Anil Verma,Pune,45,"$82,000",2016-09-12,ENGINEERING
+12,Anil Verma,Pune,45,"$82,000",2016-09-12,ENGINEERING
+13,Divya Menon,Chennai,31,"$55,400",2021-08-19,HR`;
+
+function parseCSV(t){const R=[];let r=[],c='',q=false;
+ for(let i=0;i<t.length;i++){const ch=t[i];
+  if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}
+  else if(ch=='"')q=true;else if(ch==','){r.push(c);c=''}
+  else if(ch=='\n'||ch=='\r'){if(ch=='\r'&&t[i+1]=='\n')i++;r.push(c);c='';R.push(r);r=[]}
+  else c+=ch}
+ if(c!==''||r.length){r.push(c);R.push(r)}
+ const h=R.shift()||[];const rows=R.filter(x=>x.some(v=>v!=='')).map(x=>h.map((_,i)=>x[i]===undefined?'':x[i]));
+ return{headers:h,rows}}
+function toCSV(h,rows){const e=v=>v==null?'':/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v);
+ return[h,...rows].map(r=>r.map(e).join(',')).join('\n')}
+
+const isNull=v=>v==null||NULLS.has(String(v).trim().toLowerCase());
+const numOf=v=>{const s=String(v).replace(/[$€£₹,%\s]/g,'');return /^-?\d+(\.\d+)?$/.test(s)?parseFloat(s):null};
+function parseDate(v){v=String(v).trim();let m;
+ if(m=v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))return fmt(+m[1],+m[2],+m[3]);
+ if(m=v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/))return +m[1]>12?fmt(+m[3],+m[2],+m[1]):fmt(+m[3],+m[2],+m[1]);
+ const d=Date.parse(v);if(!isNaN(d)){const x=new Date(d);return fmt(x.getFullYear(),x.getMonth()+1,x.getDate())}return null}
+function fmt(y,m,d){if(m<1||m>12||d<1||d>31)return null;return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')}
+function colType(name,vals){const nn=vals.filter(v=>!isNull(v));if(!nn.length)return'text';
+ if(nn.filter(v=>numOf(v)!==null).length>=.7*nn.length)return'number';
+ if(/date|time|dob|_at$/i.test(name)&&nn.filter(v=>parseDate(v)).length>=.7*nn.length)return'date';return'text'}
+const col=(rows,i)=>rows.map(r=>r[i]);
+
+function profile(h,rows){
+ const p={missing:{},types:{},incons:{},bad:{},dups:0};
+ h.forEach((n,i)=>{const v=col(rows,i);p.missing[n]=v.filter(isNull).length;
+  const t=colType(n,v);p.types[n]=t;
+  if(t=='number')p.bad[n]=v.filter(x=>!isNull(x)&&numOf(x)===null).length;
+  if(t=='text'){const g={};v.filter(x=>!isNull(x)).forEach(x=>{const k=x.trim().toLowerCase();(g[k]=g[k]||new Set()).add(x)});
+   if(Object.keys(g).length<=60){const c=Object.values(g).filter(s=>s.size>1).length;if(c)p.incons[n]=c}}
+  else if(t=='number'&&v.some(x=>!isNull(x)&&/[^\d.\-]/.test(String(x).trim())&&numOf(x)!==null))p.incons[n]=(p.incons[n]||0)+1});
+ const seen=new Set();rows.forEach(r=>{const k=JSON.stringify(r.map(x=>String(x).trim().toLowerCase()));seen.has(k)?p.dups++:seen.add(k)});
+ return p}
+
+function showIssues(){
+ const p=profile(RAW.headers,RAW.rows),tm=Object.values(p.missing).reduce((a,b)=>a+b,0);
+ const wrongT=Object.values(p.bad).reduce((a,b)=>a+b,0),inc=Object.keys(p.incons).length;
+ let h=`<div class="grid">
+ <div class="stat"><b>${RAW.rows.length}</b><span>rows × ${RAW.headers.length} columns</span></div>
+ <div class="stat ${tm?'bad':'ok'}"><b>${tm}</b><span>missing values</span></div>
+ <div class="stat ${p.dups?'bad':'ok'}"><b>${p.dups}</b><span>duplicate rows</span></div>
+ <div class="stat ${wrongT?'bad':'ok'}"><b>${wrongT}</b><span>invalid numeric entries</span></div>
+ <div class="stat ${inc?'bad':'ok'}"><b>${inc}</b><span>columns with inconsistent values</span></div></div>
+ <div class="scroll"><table><tr><th>Column</th><th>Detected type</th><th>Missing</th><th>Notes</th></tr>`;
+ RAW.headers.forEach(n=>{const notes=[];if(p.bad[n])notes.push(p.bad[n]+' non-numeric value(s) in numeric column');
+  if(p.incons[n])notes.push('mixed case/spacing/formatting');if(n!==n.trim()||/[^a-z0-9_]/.test(n))notes.push('header not standardised');
+  h+=`<tr><td>${esc(n)}</td><td>${p.types[n]}</td><td>${p.missing[n]}</td><td>${notes.join('; ')||'–'}</td></tr>`});
+ $('issues').innerHTML=h+'</table></div>'+preview(RAW.headers,RAW.rows,'Raw preview (first 8 rows)');
+ const O=[['names','Standardise column names','snake_case, no stray spaces'],['trim','Trim whitespace','leading/trailing spaces in every cell'],
+ ['nulls','Convert placeholders to blanks','N/A, null, ?, -, none …'],['dups','Remove duplicate rows','exact duplicates, ignoring case/spacing'],
+ ['types','Fix data types','numbers stripped of $ , %; dates → YYYY-MM-DD; invalid entries become blank'],
+ ['case','Unify inconsistent text','e.g. "sales", "SALES", "Sales" → one label'],
+ ['fill','Handle missing values','drop columns >60% empty; median for numbers, most common value for text']];
+ $('opts').innerHTML=O.map(([k,t,d])=>`<label class="opt"><input type="checkbox" id="o_${k}" checked><span><b>${t}</b><small>${d}</small></span></label>`).join('');
+ ['s2','s3'].forEach(i=>$(i).classList.remove('hide'));$('s4').classList.add('hide');$('s2').scrollIntoView({behavior:'smooth'})}
+
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function preview(h,rows,title){return`<p style="margin:14px 0 0;color:var(--mute)">${title}</p><div class="scroll"><table><tr>${h.map(x=>`<th>${esc(x)}</th>`).join('')}</tr>`+
+ rows.slice(0,8).map(r=>'<tr>'+r.map(v=>isNull(v)?'<td class="n">'+(v===null||v===''?'null':esc(v))+'</td>':`<td>${esc(v)}</td>`).join('')+'</tr>').join('')+'</table></div>'}
+
+function runClean(){
+ const o=k=>$('o_'+k).checked,log=[];let h=[...RAW.headers],rows=RAW.rows.map(r=>[...r]);const n0=rows.length,c0=h.length;
+ if(o('names')){h=h.map(x=>x.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''));log.push('Standardised column names to snake_case')}
+ if(o('trim')){let k=0;rows=rows.map(r=>r.map(v=>{const t=String(v).trim();if(t!==v)k++;return t}));log.push(`Trimmed whitespace in ${k} cell(s)`)}
+ if(o('nulls')){let k=0;rows=rows.map(r=>r.map(v=>{if(isNull(v)){if(v!==''||true)k++;return null}return v}));log.push(`Converted ${k} placeholder/empty cell(s) to null`)}
+ if(o('dups')){const s=new Set();const b=rows.length;rows=rows.filter(r=>{const k=JSON.stringify(r.map(x=>x==null?null:String(x).trim().toLowerCase()));if(s.has(k))return false;s.add(k);return true});log.push(`Removed ${b-rows.length} duplicate row(s)`)}
+ const types=h.map((n,i)=>colType(n,col(rows,i)));
+ if(o('types'))h.forEach((n,i)=>{if(types[i]=='number'){let f=0,bad=0;rows.forEach(r=>{if(r[i]==null)return;const x=numOf(r[i]);if(x===null){r[i]=null;bad++}else{if(String(r[i])!==String(x))f++;r[i]=x}});
+   log.push(`Converted \`${n}\` to numeric (${f} reformatted, ${bad} invalid → null)`)}
+  else if(types[i]=='date'){let bad=0;rows.forEach(r=>{if(r[i]==null)return;const x=parseDate(r[i]);if(!x)bad++;r[i]=x});log.push(`Converted \`${n}\` to ISO dates (${bad} unparseable → null)`)}});
+ if(o('case'))h.forEach((n,i)=>{if(types[i]!='text')return;const g={};rows.forEach(r=>{if(r[i]==null)return;const k=String(r[i]).trim().toLowerCase().replace(/\s+/g,' ');const m=(g[k]=g[k]||{});m[r[i]]=(m[r[i]]||0)+1});
+  if(Object.keys(g).length>60)return;let ch=0;const best={};for(const k in g)best[k]=Object.entries(g[k]).sort((a,b)=>b[1]-a[1])[0][0];
+  rows.forEach(r=>{if(r[i]==null)return;const k=String(r[i]).trim().toLowerCase().replace(/\s+/g,' ');if(best[k]!==r[i]){r[i]=best[k];ch++}});
+  if(ch)log.push(`Unified ${ch} inconsistent label(s) in \`${n}\``)});
+ if(o('fill')){const drop=[];h.forEach((n,i)=>{const m=rows.filter(r=>r[i]==null).length;if(rows.length&&m/rows.length>.6)drop.push(i)});
+  if(drop.length){log.push('Dropped column(s) with >60% missing: '+drop.map(i=>'`'+h[i]+'`').join(', '));h=h.filter((_,i)=>!drop.includes(i));rows=rows.map(r=>r.filter((_,i)=>!drop.includes(i)))}
+  const t2=h.map((n,i)=>colType(n,col(rows,i)));
+  h.forEach((n,i)=>{const m=rows.filter(r=>r[i]==null).length;if(!m)return;
+   if(t2[i]=='number'){const v=rows.map(r=>r[i]).filter(x=>x!=null&&!isNaN(x)).sort((a,b)=>a-b);if(!v.length)return;const md=v.length%2?v[(v.length-1)/2]:(v[v.length/2-1]+v[v.length/2])/2;rows.forEach(r=>{if(r[i]==null)r[i]=md});log.push(`Filled ${m} missing \`${n}\` with median (${+md.toFixed(2)})`)}
+   else if(t2[i]=='text'){const c={};rows.forEach(r=>{if(r[i]!=null)c[r[i]]=(c[r[i]]||0)+1});const md=(Object.entries(c).sort((a,b)=>b[1]-a[1])[0]||['Unknown'])[0];rows.forEach(r=>{if(r[i]==null)r[i]=md});log.push(`Filled ${m} missing \`${n}\` with most common value ('${md}')`)}
+   else log.push(`Left ${m} missing date(s) in \`${n}\` as null (no safe fill)`)})}
+ OUT={h,rows};const q=profile(h,rows),left=Object.values(q.missing).reduce((a,b)=>a+b,0);
+ LOG=`# Cleaning log\n\nRaw: ${n0} rows x ${c0} columns\nCleaned: ${rows.length} rows x ${h.length} columns\n\n## Actions\n`+log.map(x=>'- '+x).join('\n')+'\n';
+ $('res').innerHTML=`<div class="grid"><div class="stat"><b>${n0} → ${rows.length}</b><span>rows</span></div><div class="stat"><b>${c0} → ${h.length}</b><span>columns</span></div>
+ <div class="stat ${left?'bad':'ok'}"><b>${left}</b><span>missing values left</span></div><div class="stat ${q.dups?'bad':'ok'}"><b>${q.dups}</b><span>duplicates left</span></div></div>
+ <h2 style="margin-top:16px">Changes made</h2><ul class="log">${log.map(x=>'<li>'+esc(x).replace(/`([^`]+)`/g,'<code>$1</code>')+'</li>').join('')||'<li>No actions selected</li>'}</ul>`+preview(h,rows,'Cleaned preview (first 8 rows)');
+ $('ta').value=toCSV(h,rows);$('s4').classList.remove('hide');$('s4').scrollIntoView({behavior:'smooth'})}
+
+async function dl(kind){
+ const csv=kind=='csv',data=csv?toCSV(OUT.h,OUT.rows):LOG,name=csv?'cleaned.csv':'cleaning_log.md';
+ try{const d=await claude.use('downloads');if(!d){alert('Saving is not available here. Use "Copy CSV text instead" below.');$('s4').querySelector('details').open=true;return}
+  await d.save({filename:name,data:new Blob([data],{type:csv?'text/csv':'text/markdown'})})}
+ catch(e){if(!e||e.code!=='declined'){$('s4').querySelector('details').open=true}}}
+
+function load(text){try{RAW=parseCSV(text);if(!RAW.headers.length||!RAW.rows.length)throw 0;showIssues()}catch(e){alert('Could not read that file as CSV.')}}
+function loadSample(){load(SAMPLE)}
+$('fileIn').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(load)};
+const dz=$('drop');['dragover','dragenter'].forEach(x=>dz.addEventListener(x,e=>{e.preventDefault();dz.classList.add('on')}));
+['dragleave','drop'].forEach(x=>dz.addEventListener(x,e=>{e.preventDefault();dz.classList.remove('on')}));
+dz.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)f.text().then(load)});
+</script>
+</body>
+</html>
